@@ -42,8 +42,12 @@ New-Item -ItemType Directory -Force $Work | Out-Null
 function Need($cmd, $hint) {
   if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) { throw "$cmd is required: $hint" }
 }
+# Deliberately a simple function (no param block / [Parameter] attributes):
+# an advanced function gets common parameters, so a native flag like
+# `python -I` would bind as an ambiguous -InformationAction/-InformationVariable.
 function Invoke-Checked {
-  param([string]$Exe, [Parameter(ValueFromRemainingArguments)][string[]]$Rest)
+  $Exe = $args[0]
+  $Rest = @($args | Select-Object -Skip 1)
   & $Exe @Rest
   if ($LASTEXITCODE -ne 0) { throw "$Exe $($Rest -join ' ') failed with exit code $LASTEXITCODE" }
 }
