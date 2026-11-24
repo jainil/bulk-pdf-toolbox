@@ -24,9 +24,11 @@ param(
   [string]$PythonVersion = $(if ($env:PYTHON_VERSION) { $env:PYTHON_VERSION } else { '3.13' }),
   [string]$OcrmypdfVersion = $env:OCRMYPDF_VERSION,
   [string[]]$Languages = $(if ($env:TESS_LANGS) { $env:TESS_LANGS -split '\s+' } else { @('eng', 'osd') }),
-  # UB Mannheim builds are the de-facto Windows Tesseract distribution.
+  # UB Mannheim builds are the de-facto Windows Tesseract distribution. Only
+  # some of their builds get a GitHub release (5.5.0 lives solely on their
+  # university mirror, which blocks scripted downloads), so pin a GitHub one.
   [string]$TesseractUrl = $(if ($env:TESSERACT_URL) { $env:TESSERACT_URL } else {
-      'https://github.com/UB-Mannheim/tesseract/releases/download/v5.5.0.20241111/tesseract-ocr-w64-setup-5.5.0.20241111.exe' }),
+      'https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe' }),
   [string]$PngquantUrl = 'https://pngquant.org/pngquant-windows.zip'
 )
 
