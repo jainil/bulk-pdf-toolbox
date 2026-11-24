@@ -174,26 +174,59 @@ fn partials_in(dir: &Path) -> Vec<PathBuf> {
 /// (Some(false)) or gone (None).
 #[cfg(unix)]
 fn tree_frozen(pid: u32) -> Option<bool> {
+    tree_states(pid).0
+}
+
+/// [`tree_frozen`] plus the raw per-process states, for failure messages.
+#[cfg(unix)]
+fn tree_states(pid: u32) -> (Option<bool>, Vec<String>) {
     let st = group_states(pid);
-    (!st.is_empty()).then(|| st.iter().all(|s| s.starts_with('T')))
+    ((!st.is_empty()).then(|| st.iter().all(|s| s.starts_with('T'))), st)
 }
 
 /// Windows: every thread of the worker process is in the Suspended wait state.
 #[cfg(windows)]
 fn tree_frozen(pid: u32) -> Option<bool> {
+    tree_states(pid).0
+}
+
+/// [`tree_frozen`] plus each thread's `ThreadState:WaitReason`, for failure
+/// messages. `WaitReason` throws for threads that are not waiting, so it is
+/// only read for `Wait` threads.
+#[cfg(windows)]
+fn tree_states(pid: u32) -> (Option<bool>, Vec<String>) {
     let script = format!(
-        "$p = Get-Process -Id {pid} -ErrorAction SilentlyContinue; if ($p) {{ $p.Threads | ForEach-Object {{ [string]$_.WaitReason }} }}"
+        "$p = Get-Process -Id {pid} -ErrorAction SilentlyContinue; if ($p) {{ $p.Threads | ForEach-Object {{ if ([string]$_.ThreadState -eq 'Wait') {{ 'Wait:' + [string]$_.WaitReason }} else {{ [string]$_.ThreadState + ':-' }} }} }}"
     );
     let out = Command::new("powershell")
         .args(["-NoProfile", "-Command", &script])
         .output()
         .unwrap();
-    let reasons: Vec<String> = String::from_utf8_lossy(&out.stdout)
+    let states: Vec<String> = String::from_utf8_lossy(&out.stdout)
         .lines()
         .map(|l| l.trim().to_string())
         .filter(|l| !l.is_empty())
         .collect();
-    (!reasons.is_empty()).then(|| reasons.iter().all(|r| r == "Suspended"))
+    (
+        (!states.is_empty()).then(|| states.iter().all(|r| r == "Wait:Suspended")),
+        states,
+    )
+}
+
+/// Polls until the worker's tree is frozen; suspension is asynchronous (a
+/// thread inside a kernel critical region only stops once it leaves it).
+fn assert_frozen_soon(pid: u32) {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let (frozen, states) = tree_states(pid);
+        if frozen == Some(true) {
+            return;
+        }
+        if Instant::now() > deadline {
+            panic!("worker {pid} not frozen: {frozen:?} states={states:?}");
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
 }
 
 /// Process states of every process in a process group (`T` = stopped).
@@ -300,12 +333,16 @@ fn pause_suspends_process_tree_and_resume_continues() {
     h.engine.pause();
     let pids = h.engine.active_pids();
     assert_eq!(pids.len(), 2, "two files in flight");
-    std::thread::sleep(Duration::from_millis(300));
+    // Paused status means proc::suspend succeeded (the worker is in its job).
+    assert_eq!(
+        count(&h.jobs(), JobStatus::Paused),
+        2,
+        "suspend failed for a worker"
+    );
     for pid in &pids {
-        assert_eq!(tree_frozen(*pid), Some(true), "worker {pid} not frozen");
+        assert_frozen_soon(*pid);
     }
     let jobs = h.jobs();
-    assert_eq!(count(&jobs, JobStatus::Paused), 2);
     assert_eq!(
         count(&jobs, JobStatus::Queued),
         1,
