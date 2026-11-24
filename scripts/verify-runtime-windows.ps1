@@ -20,8 +20,12 @@ foreach ($k in 'PATH', 'PYTHONHOME', 'PYTHONPATH', 'PYTHONNOUSERSITE', 'PYTHONDO
   $saved[$k] = [Environment]::GetEnvironmentVariable($k, 'Process')
 }
 function Set-Env($k, $v) { [Environment]::SetEnvironmentVariable($k, $v, 'Process') }
+# Deliberately a simple function (no param block / [Parameter] attributes):
+# an advanced function gets common parameters, so a native flag like
+# `ocrmypdf -O 2` would bind as an ambiguous -OutVariable/-OutBuffer.
 function Run {
-  param([string]$Exe, [Parameter(ValueFromRemainingArguments)][string[]]$Rest)
+  $Exe = $args[0]
+  $Rest = @($args | Select-Object -Skip 1)
   & $Exe @Rest
   if ($LASTEXITCODE -ne 0) { throw "$Exe $($Rest -join ' ') failed with exit code $LASTEXITCODE" }
 }
