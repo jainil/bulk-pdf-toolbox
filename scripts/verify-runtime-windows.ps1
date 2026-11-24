@@ -44,7 +44,7 @@ try {
 
   Write-Host '-- tesseract'; Run "$Runtime\bin\tesseract.exe" --version
   Run "$Runtime\bin\tesseract.exe" --list-langs
-  if (Test-Path "$Runtime\bin\pngquant.exe") { Write-Host '-- pngquant'; Run "$Runtime\bin\pngquant.exe" --version }
+  Write-Host '-- pngquant'; Run "$Runtime\bin\pngquant.exe" --version
   Write-Host '-- ocrmypdf'; Run $Py -m ocrmypdf --version
 
   Write-Host '-- end-to-end OCR'

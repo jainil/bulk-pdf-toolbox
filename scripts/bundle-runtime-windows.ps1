@@ -133,17 +133,25 @@ try {
   }
 
   # ------------------------------------------------------------ pngquant
-  # Only used by "Lossy"/"Aggressive" optimization; ocrmypdf skips it if absent.
+  # Required: ocrmypdf hard-fails "Lossy"/"Aggressive" optimization (-O 2/3)
+  # without it, so a runtime missing it would break those settings. The
+  # download host is occasionally slow, so retry before giving up.
   Write-Host '==> pngquant'
-  try {
-    $Zip = Join-Path $Work 'pngquant.zip'
-    Invoke-WebRequest -UseBasicParsing -Uri $PngquantUrl -OutFile $Zip
-    Expand-Archive -Force $Zip (Join-Path $Work 'pngquant')
-    $pq = Get-ChildItem (Join-Path $Work 'pngquant') -Recurse -Filter 'pngquant.exe' | Select-Object -First 1
-    Copy-Item $pq.FullName "$Out\bin\"
-  } catch {
-    Write-Warning "pngquant not bundled ($_). Lossy optimization will be skipped by ocrmypdf."
+  $Zip = Join-Path $Work 'pngquant.zip'
+  for ($try = 1; ; $try++) {
+    try {
+      Invoke-WebRequest -UseBasicParsing -TimeoutSec 60 -Uri $PngquantUrl -OutFile $Zip
+      break
+    } catch {
+      if ($try -ge 5) { throw "pngquant download failed after $try attempts: $_" }
+      Write-Warning "pngquant download attempt $try failed ($_); retrying"
+      Start-Sleep -Seconds (10 * $try)
+    }
   }
+  Expand-Archive -Force $Zip (Join-Path $Work 'pngquant')
+  $pq = Get-ChildItem (Join-Path $Work 'pngquant') -Recurse -Filter 'pngquant.exe' | Select-Object -First 1
+  if (-not $pq) { throw "pngquant.exe not found in $PngquantUrl" }
+  Copy-Item $pq.FullName "$Out\bin\"
 
   # ------------------------------------------------------------ Verify
   Write-Host '==> Verifying runtime with a clean environment'
