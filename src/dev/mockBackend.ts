@@ -9,7 +9,7 @@ import type { Job, JobStatus, Meta, Settings } from "../lib/types";
 
 const settings: Settings = {
   languages: ["eng"], mode: "skip", outputType: "auto", optimize: 1, deskew: false, rotatePages: false,
-  sidecar: false, outputMode: "suffix", suffix: "_ocr", outputDir: null, conflict: "rename",
+  sidecar: false, invalidateSignatures: false, outputMode: "suffix", suffix: "_ocr", outputDir: null, conflict: "rename",
   parallelFiles: 3, jobsPerFile: 3, maxRetries: 1, stallTimeoutMin: 15,
 };
 let state: Meta["state"] = "idle";
@@ -38,6 +38,7 @@ function seed() {
   }
   add(mk("contract_signed.pdf", "failed", { errorKind: "encrypted", message: "Encrypted or password-protected PDF" }));
   add(mk("statement_march.pdf", "skipped", { errorKind: "already_has_text", message: "Already has text (choose Skip/Redo/Force mode to process it)" }));
+  add(mk("nda_signed.pdf", "skipped", { errorKind: "digitally_signed", message: "Digitally signed — turn on “Process signed PDFs” to OCR it (breaks the signature)" }));
   add(mk("scan_broken.pdf", "failed", { attempts: 2, errorKind: "invalid_input", message: "Invalid or unsupported PDF: unable to find trailer dictionary" }));
   for (let i = 0; i < 3; i++) add(mk(`board_minutes_${i + 1}.pdf`, "running", { stage: "OCR", stageTotal: 12, pages: 12 }));
   for (let i = 0; i < 160; i++) add(mk(`archive/box_${Math.floor(i / 20)}/page_scan_${String(i).padStart(4, "0")}.pdf`, "queued"));

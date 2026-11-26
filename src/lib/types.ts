@@ -12,6 +12,7 @@ export type ErrorKind =
   | "invalid_input"
   | "missing_input"
   | "already_has_text"
+  | "digitally_signed"
   | "output_exists"
   | "output_error"
   | "missing_dependency"
@@ -54,6 +55,7 @@ export interface Settings {
   deskew: boolean;
   rotatePages: boolean;
   sidecar: boolean;
+  invalidateSignatures: boolean;
   outputMode: OutputMode;
   suffix: string;
   outputDir: string | null;

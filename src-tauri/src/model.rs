@@ -34,6 +34,8 @@ pub enum ErrorKind {
     InvalidInput,
     MissingInput,
     AlreadyHasText,
+    /// Digitally signed; skipped unless the user allows invalidating it.
+    DigitallySigned,
     OutputExists,
     OutputError,
     MissingDependency,
@@ -153,6 +155,8 @@ pub struct Settings {
     pub deskew: bool,
     pub rotate_pages: bool,
     pub sidecar: bool,
+    /// OCR digitally signed PDFs anyway, invalidating their signatures.
+    pub invalidate_signatures: bool,
     // --- Output
     pub output_mode: OutputMode,
     pub suffix: String,
@@ -183,6 +187,7 @@ impl Default for Settings {
             deskew: false,
             rotate_pages: false,
             sidecar: false,
+            invalidate_signatures: false,
             output_mode: OutputMode::Suffix,
             suffix: "_ocr".into(),
             output_dir: None,
@@ -252,6 +257,9 @@ impl Settings {
         // ocrmypdf rejects --deskew together with --redo-ocr.
         if self.deskew && self.mode != OcrMode::Redo {
             o["deskew"] = json!(true);
+        }
+        if self.invalidate_signatures {
+            o["invalidate_digital_signatures"] = json!(true);
         }
         if let Some(s) = sidecar {
             o["sidecar"] = json!(s);

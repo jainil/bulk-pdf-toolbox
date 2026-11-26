@@ -8,6 +8,9 @@ object per line, so the Rust side can show progress without a TTY:
     {"t": "log", "level": "WARNING", "msg": "..."}
     {"t": "done", "code": 0, "msg": ""}
 
+Exit codes are ocrmypdf's, plus 20 for a digitally signed input that was not
+allowed to be processed (see SIGNED_CODE).
+
 Usage: python3 bpt_ocr_worker.py '<json job spec>'
 
 On Unix the worker leads its own process group: if the app that launched it
@@ -56,6 +59,9 @@ class EventLogHandler(logging.Handler):
 # the app enforces its own stall timeout that excludes paused time.
 LONG_TIMEOUT = 7 * 24 * 3600.0
 
+# Exit code for "input is digitally signed" (outside ocrmypdf's own range).
+SIGNED_CODE = 20
+
 
 def parent_watchdog(original_ppid: int) -> None:
     """Kill our process group if the launching app goes away (Unix only;
@@ -91,7 +97,7 @@ def main() -> int:
 
     try:
         import ocrmypdf
-        from ocrmypdf.exceptions import ExitCode, ExitCodeException
+        from ocrmypdf.exceptions import DigitalSignatureError, ExitCode, ExitCodeException
     except Exception as e:  # missing / broken runtime
         emit({"t": "done", "code": 3, "msg": f"Failed to load ocrmypdf: {e}"})
         return 3
@@ -112,6 +118,11 @@ def main() -> int:
         code = int(code)
         emit({"t": "done", "code": code, "msg": "" if code == 0 else ExitCode(code).name})
         return code
+    except DigitalSignatureError as e:
+        # ocrmypdf reports this as a generic input error (2); give the app a
+        # distinct code so it can skip the file with a clear explanation.
+        emit({"t": "done", "code": SIGNED_CODE, "msg": str(e).strip() or "digitally signed"})
+        return SIGNED_CODE
     except ExitCodeException as e:
         code = int(e.exit_code)
         emit({"t": "done", "code": code, "msg": str(e) or type(e).__name__})

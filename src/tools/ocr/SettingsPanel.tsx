@@ -228,6 +228,15 @@ export function SettingsPanel({ settings: s, languages, locked, onChange, onClos
                 <input type="checkbox" checked={s.sidecar} onChange={(e) => set("sidecar", e.target.checked)} />
                 Also save text as .txt
               </label>
+              <label className="check">
+                <input type="checkbox" checked={s.invalidateSignatures} onChange={(e) => set("invalidateSignatures", e.target.checked)} />
+                Process signed PDFs
+                <InfoTip>
+                  Digitally signed PDFs are skipped by default, because adding text changes the file and breaks the
+                  signature. Turn this on to OCR them anyway — the copy will no longer verify as signed. Your original
+                  is kept unless you chose “Replace original”.
+                </InfoTip>
+              </label>
             </Section>
 
             <Section title="Performance">

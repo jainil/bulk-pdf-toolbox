@@ -1,6 +1,6 @@
 [package]
 name = "bulk-pdf-toolbox"
-version = "0.1.0"
+version = "0.1.1"
 description = "Bulk PDF tools: batch OCR and more"
 authors = ["Jainil Parekh"]
 edition = "2024"

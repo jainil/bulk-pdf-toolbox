@@ -933,6 +933,17 @@ impl Engine {
                         );
                         None
                     }
+                    // Worker-specific code: input has a digital signature.
+                    Some(20) => {
+                        p.plan.discard();
+                        j.status = JobStatus::Skipped;
+                        j.error_kind = Some(ErrorKind::DigitallySigned);
+                        j.message = Some(
+                            "Digitally signed — turn on “Process signed PDFs” to OCR it (breaks the signature)"
+                                .into(),
+                        );
+                        None
+                    }
                     Some(8) => Some((
                         false,
                         ErrorKind::Encrypted,

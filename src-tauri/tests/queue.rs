@@ -538,6 +538,54 @@ fn error_states_are_classified() {
     );
 }
 
+/// Mark a PDF as signed the way ocrmypdf detects it (AcroForm /SigFlags bit 1).
+fn mark_signed(rt: &OcrRuntime, src: &Path, dst: &Path) {
+    let st = rt
+        .std_command(&rt.python)
+        .args(["-c", "import sys,pikepdf; p=pikepdf.open(sys.argv[1]); p.Root.AcroForm=pikepdf.Dictionary(Fields=pikepdf.Array(), SigFlags=3); p.save(sys.argv[2])"])
+        .arg(src)
+        .arg(dst)
+        .status()
+        .unwrap();
+    assert!(st.success());
+}
+
+#[test]
+fn signed_pdfs_skip_unless_allowed() {
+    let Some(rt) = runtime() else { return };
+    for allow in [false, true] {
+        let h = Harness::new(
+            rt.clone(),
+            Settings {
+                invalidate_signatures: allow,
+                ..base_settings()
+            },
+        );
+        let d = h.files.path();
+        let plain = make_pdfs(&rt, d, 1, 1, 150, "plain").remove(0);
+        let signed = d.join("signed.pdf");
+        mark_signed(&rt, &plain, &signed);
+        std::fs::remove_file(&plain).unwrap();
+
+        h.engine.add_paths(vec![signed.clone()]);
+        h.engine.start().unwrap();
+        h.wait("drained", 120, |_, s| s == QueueState::Idle);
+        let j = h.jobs().remove(0);
+        if allow {
+            assert_eq!(j.status, JobStatus::Done, "{j:?}");
+            assert!(pdf_text(&rt, j.output.as_ref().unwrap()).contains("plain"));
+        } else {
+            assert_eq!(
+                (j.status, j.error_kind),
+                (JobStatus::Skipped, Some(ErrorKind::DigitallySigned)),
+                "{j:?}"
+            );
+            assert_eq!(j.attempts, 1, "not retried");
+            assert!(partials_in(d).is_empty());
+        }
+    }
+}
+
 #[test]
 fn missing_language_pauses_queue_with_fatal_error() {
     let Some(rt) = runtime() else { return };
